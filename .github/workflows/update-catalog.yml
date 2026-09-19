@@ -1,0 +1,39 @@
+# Keeps the website's episode list fresh: reads u-tv.ru every 3 hours and, when something
+# changed (new episodes, or a locked one that opened up), commits catalog.json and descs.json.
+# GitHub Pages then serves the new list, so the site needs no attention.
+name: Update catalog
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch: {}      # the "Run workflow" button, for when you don't want to wait
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Read u-tv.ru
+        run: node build-catalog.mjs
+      - name: Commit when something changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json descs.json
+          if git diff --cached --quiet; then
+            echo "nothing new"
+          else
+            git commit -m "Update episode list"
+            git push
+          fi
