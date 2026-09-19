@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>U-TV Downloader</title>
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Watch u-tv.ru shows at the best quality, on a computer or a TV browser.">
+  <link rel="icon" href="icon32.png">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="app.css">
+  <style>
+    /* The website is the extension's screen without the download parts (no bottom bar, no queue). */
+    :root { --bar-h: 0px; }
+    .ep { grid-template-columns: 128px 64px minmax(0, 1fr) auto auto; cursor: pointer; }
+    @media (max-width: 560px) { .ep { grid-template-columns: 96px minmax(0, 1fr) auto; } .ep .thumb { width: 96px; } }
+    .ep:focus-within, .news-item:focus-within, .season-head:focus { background: var(--chip); }
+    .news-item { grid-template-columns: 104px minmax(0, 1fr); }
+    .news-open { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
+    .player-dlg .btn:focus, .player-dlg .icon-btn:focus { border-color: var(--accent); }
+    /* Keep the whole player on screen, buttons included, on a 720p TV too. */
+    .player-dlg { max-height: calc(100vh - 12px); }
+    #playerVideo { max-height: calc(100vh - 170px); object-fit: contain; }
+    /* Fallback for TV browsers that refuse the fullscreen API: fill the page, which on a TV is the screen. */
+    body.page-full { overflow: hidden; }
+    .player-dlg.page-full {
+      position: fixed; inset: 0; width: 100vw; max-width: none; height: 100vh; max-height: none;
+      margin: 0; padding: 0; border: 0; border-radius: 0; background: #000;
+    }
+    .player-dlg.page-full .player-head, .player-dlg.page-full .player-bar { display: none; }
+    .player-dlg.page-full #playerVideo { width: 100vw; height: 100vh; max-height: none; border-radius: 0; }
+    .ep-pos { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); pointer-events: none; }
+    /* Remote control / keyboard: a clear ring on whatever is selected. */
+    body.keys :focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+    body.keys .ep :focus, body.keys .news-item :focus.play-btn { outline-offset: -3px; }
+    body.keys .play-btn:focus { opacity: 1; background: rgba(0, 0, 0, .25); }
+    body.keys .fav-star:focus { opacity: 1; }
+    /* Browsers without <dialog> */
+    dialog.no-modal[open] { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; margin: 0; max-height: 96vh; overflow: auto; }
+    #dlgShade { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); z-index: 49; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icon48.png" alt="" width="24" height="24">
+      <span>U-TV Downloader</span>
+    </div>
+    <div class="top-actions">
+      <button id="settingsBtn" class="icon-btn" type="button" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+  </header>
+
+  <dialog id="playerDlg" class="player-dlg" aria-labelledby="playerTitle">
+    <div class="player-head">
+      <div class="player-title-wrap">
+        <div id="playerShow" class="muted small"></div>
+        <h2 id="playerTitle"></h2>
+      </div>
+      <button id="playerClose" class="icon-btn" type="button" title="Close (Back / Esc)" aria-label="Close player">✕</button>
+    </div>
+    <video id="playerVideo" controls playsinline tabindex="0"></video>
+    <div class="player-bar">
+      <span id="playerNote" class="muted small"></span>
+      <span class="player-actions">
+        <button id="playerCast" class="btn" type="button" title="Play on a TV with Google Cast / Chromecast built in" hidden>📺 Cast to TV</button>
+        <button id="playerRestart" class="btn" type="button" hidden>↺ From the start</button>
+        <button id="playerFull" class="btn" type="button" title="Full screen (F)">⛶ Full screen</button>
+        <button id="playerNext" class="btn primary" type="button" hidden>Next ⏭</button>
+      </span>
+    </div>
+  </dialog>
+
+  <dialog id="settingsDlg" class="dialog" aria-labelledby="settingsTitle">
+    <form method="dialog">
+      <h2 id="settingsTitle">Settings</h2>
+      <div class="setting">
+        <div class="setting-label">Theme</div>
+        <div class="seg" role="radiogroup" aria-label="Theme">
+          <button type="button" class="seg-btn" data-set="theme" data-val="system">System</button>
+          <button type="button" class="seg-btn" data-set="theme" data-val="light">Light</button>
+          <button type="button" class="seg-btn" data-set="theme" data-val="dark">Dark</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div class="setting-label">When you press play</div>
+        <div class="seg" role="radiogroup" aria-label="Where episodes play">
+          <button type="button" class="seg-btn" data-set="full" data-val="on">Full screen</button>
+          <button type="button" class="seg-btn" data-set="full" data-val="off">In the page</button>
+        </div>
+        <p class="setting-help">Full screen fills the TV straight away. Back (or Esc) leaves the episode.</p>
+      </div>
+      <div class="setting">
+        <div class="setting-label">Episode list</div>
+        <p class="setting-help" id="catalogNote"></p>
+      </div>
+      <div class="setting">
+        <div class="setting-label">Remote control</div>
+        <p class="setting-help">Arrows move, OK plays or opens, Back goes back. While an episode plays: ◀ ▶ skip 10 s, OK pauses, Back leaves it, F or ⛶ switches full screen.</p>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+
+  <main class="layout">
+    <section class="pane" id="browsePane">
+      <div id="pickerView" hidden>
+        <div class="search">
+          <input id="searchInput" type="search" placeholder="Search shows, or paste a u-tv.ru show link" autocomplete="off" spellcheck="false">
+        </div>
+        <p id="pickerNote" class="muted small"></p>
+        <ul id="showList" class="show-list"></ul>
+      </div>
+
+      <div id="showView" hidden>
+        <div class="show-head">
+          <button id="backBtn" class="link" type="button">← All shows</button>
+          <div class="show-id">
+            <span id="showPoster" class="show-poster" hidden></span>
+            <div>
+              <h1 id="showTitle"></h1>
+              <div class="show-actions">
+                <button id="favBtn" class="fav-btn" type="button">☆ Add to favourites</button>
+                <a id="showLink" class="muted small" target="_blank" rel="noopener">Open on u-tv.ru</a>
+              </div>
+            </div>
+          </div>
+          <div id="familyBar" class="family-bar" hidden></div>
+        </div>
+        <div class="find">
+          <input id="findInput" type="search" placeholder="Find a name in the episode descriptions (e.g. Изотова, Вилена)…" autocomplete="off" spellcheck="false">
+          <ul id="findResults" class="find-results" hidden></ul>
+        </div>
+        <div id="seasons"></div>
+      </div>
+
+      <div id="loadingView" class="center muted" hidden>
+        <div class="spinner"></div>
+        <p id="loadingText">Loading…</p>
+      </div>
+
+      <div id="errorView" class="center" hidden>
+        <p id="errorText"></p>
+        <button id="retryBtn" class="btn" type="button">Try again</button>
+        <p><button id="errorBackBtn" class="link" type="button">← All shows</button></p>
+      </div>
+    </section>
+
+    <aside class="side" id="side">
+      <section class="pane news-pane" id="newsPane">
+        <div class="news-head">
+          <h2>What's new</h2>
+          <button id="newsRefresh" class="link small" type="button" title="Check for new episodes">↻ Refresh</button>
+        </div>
+        <div class="news-tabs" role="tablist">
+          <button type="button" role="tab" class="news-tab" data-news="fav">★ Favourites <span id="newsFavCount" class="news-count" hidden></span></button>
+          <button type="button" role="tab" class="news-tab" data-news="all">All of u-tv</button>
+        </div>
+        <p id="newsNote" class="muted small" hidden></p>
+        <ul id="newsList" class="news-list"></ul>
+        <div class="news-foot">
+          <button id="newsSeen" class="link small" type="button" hidden>Mark all as seen</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="web.js"></script>
+</body>
+</html>

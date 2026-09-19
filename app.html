@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>U-TV Downloader</title>
+  <link rel="icon" href="icon32.png">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icon48.png" alt="" width="24" height="24">
+      <span>U-TV Downloader</span>
+    </div>
+    <div class="top-actions">
+      <button id="folderBtn" class="link" type="button" title="Open Chrome's download folder">Open folder</button>
+      <button id="settingsBtn" class="icon-btn" type="button" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+  </header>
+
+  <dialog id="playerDlg" class="player-dlg" aria-labelledby="playerTitle">
+    <div class="player-head">
+      <div class="player-title-wrap">
+        <div id="playerShow" class="muted small"></div>
+        <h2 id="playerTitle"></h2>
+      </div>
+      <button id="playerClose" class="icon-btn" type="button" title="Close (Esc)" aria-label="Close player">✕</button>
+    </div>
+    <video id="playerVideo" controls playsinline></video>
+    <div class="player-bar">
+      <span id="playerNote" class="muted small"></span>
+      <span class="player-actions">
+        <button id="playerCast" class="btn" type="button" title="Play on a TV with Google Cast / Chromecast built in">📺 Cast to TV</button>
+        <button id="playerDownload" class="btn primary" type="button">⬇ Download</button>
+      </span>
+    </div>
+    <details class="player-tips">
+      <summary>AirPlay or a TV without Cast?</summary>
+      <p>Chrome can't AirPlay on any system, so the extension can't either. The quickest full-quality route:</p>
+      <ul>
+        <li><strong>Mac or iPhone:</strong> download as MP4, open it (History → ▶ Play opens QuickTime on a Mac) and press the AirPlay button.</li>
+        <li><strong>Windows:</strong> download as MP4, open it in Films &amp; TV (History → ▶ Play) and use <em>Cast to device</em>, or right-click the file → <em>Cast to Device</em>. Most smart TVs, including Hisense, accept this.</li>
+        <li><strong>Linux:</strong> download as MP4 and play it from VLC's <em>Playback → Renderer</em> menu (Chromecast), or use your TV's DLNA/media-server app.</li>
+      </ul>
+    </details>
+  </dialog>
+
+  <dialog id="settingsDlg" class="dialog" aria-labelledby="settingsTitle">
+    <form method="dialog">
+      <h2 id="settingsTitle">Settings</h2>
+      <div class="setting">
+        <div class="setting-label">Save episodes as</div>
+        <div class="seg" role="radiogroup" aria-label="File format">
+          <button type="button" class="seg-btn" data-set="format" data-val="mp4">MP4</button>
+          <button type="button" class="seg-btn" data-set="format" data-val="ts">TS</button>
+        </div>
+        <p class="setting-help" id="formatHelp"></p>
+      </div>
+      <div class="setting">
+        <div class="setting-label">Episodes downloading at once</div>
+        <div class="seg" role="radiogroup" aria-label="Episodes at once">
+          <button type="button" class="seg-btn" data-set="parallel" data-val="1">1</button>
+          <button type="button" class="seg-btn" data-set="parallel" data-val="2">2</button>
+          <button type="button" class="seg-btn" data-set="parallel" data-val="3">3</button>
+        </div>
+        <p class="setting-help">They share your connection, so more at once doesn't mean faster overall. 2 keeps the list moving.</p>
+      </div>
+      <div class="setting">
+        <div class="setting-label">Theme</div>
+        <div class="seg" role="radiogroup" aria-label="Theme">
+          <button type="button" class="seg-btn" data-set="theme" data-val="system">System</button>
+          <button type="button" class="seg-btn" data-set="theme" data-val="light">Light</button>
+          <button type="button" class="seg-btn" data-set="theme" data-val="dark">Dark</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div class="setting-label">When a download finishes</div>
+        <div class="seg" role="radiogroup" aria-label="Notifications">
+          <button type="button" class="seg-btn" data-set="notify" data-val="on">Notify me</button>
+          <button type="button" class="seg-btn" data-set="notify" data-val="off">Stay quiet</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div class="setting-label">Where files go</div>
+        <p class="setting-help">Chrome's download folder → <strong>U-TV</strong> → one folder per show. Change the download folder in Chrome's settings (Downloads → Location).</p>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+
+  <main class="layout">
+    <section class="pane" id="browsePane">
+      <div id="pickerView" hidden>
+        <div class="search">
+          <input id="searchInput" type="search" placeholder="Search shows, or paste a u-tv.ru show link" autocomplete="off" spellcheck="false">
+        </div>
+        <p id="pickerNote" class="muted small"></p>
+        <ul id="showList" class="show-list"></ul>
+      </div>
+
+      <div id="showView" hidden>
+        <div class="show-head">
+          <button id="backBtn" class="link" type="button">← All shows</button>
+          <div class="show-id">
+            <span id="showPoster" class="show-poster" hidden></span>
+            <div>
+              <h1 id="showTitle"></h1>
+              <div class="show-actions">
+                <button id="favBtn" class="fav-btn" type="button">☆ Add to favourites</button>
+                <a id="showLink" class="muted small" target="_blank" rel="noopener">Open on u-tv.ru</a>
+              </div>
+            </div>
+          </div>
+          <div id="familyBar" class="family-bar" hidden></div>
+        </div>
+        <div class="find">
+          <input id="findInput" type="search" placeholder="Find a name in the episode descriptions (e.g. Изотова, Вилена)…" autocomplete="off" spellcheck="false">
+          <ul id="findResults" class="find-results" hidden></ul>
+        </div>
+        <div class="quick">
+          <span class="muted small">Select:</span>
+          <button class="chip" type="button" data-quick="all">All seasons</button>
+          <button class="chip" type="button" data-quick="latest">Latest season</button>
+          <button class="chip" type="button" data-quick="none">None</button>
+        </div>
+        <div id="seasons"></div>
+      </div>
+
+      <div id="loadingView" class="center muted" hidden>
+        <div class="spinner"></div>
+        <p id="loadingText">Loading…</p>
+      </div>
+
+      <div id="errorView" class="center" hidden>
+        <p id="errorText"></p>
+        <button id="retryBtn" class="btn" type="button">Try again</button>
+        <p><button id="errorBackBtn" class="link" type="button">← All shows</button></p>
+      </div>
+    </section>
+
+    <aside class="side" id="side">
+      <section class="pane news-pane" id="newsPane">
+        <div class="news-head">
+          <h2>What's new</h2>
+          <button id="newsRefresh" class="link small" type="button" title="Check for new episodes">↻ Refresh</button>
+        </div>
+        <div class="news-tabs" role="tablist">
+          <button type="button" role="tab" class="news-tab" data-news="fav">★ Favourites <span id="newsFavCount" class="news-count" hidden></span></button>
+          <button type="button" role="tab" class="news-tab" data-news="all">All of u-tv</button>
+        </div>
+        <p id="newsNote" class="muted small" hidden></p>
+        <ul id="newsList" class="news-list"></ul>
+        <div class="news-foot">
+          <button id="newsGetAll" class="link small" type="button" hidden>⬇ Download all new</button>
+          <button id="newsSeen" class="link small" type="button" hidden>Mark all as seen</button>
+        </div>
+      </section>
+
+    <section class="pane queue-pane">
+      <div class="queue-head">
+        <div class="news-tabs dl-tabs" role="tablist">
+          <button type="button" role="tab" class="news-tab on" data-dl="now">Downloads <span id="dlCount" class="news-count" hidden></span></button>
+          <button type="button" role="tab" class="news-tab" data-dl="history">History</button>
+        </div>
+      </div>
+      <div id="dlNow">
+        <div class="queue-sub">
+          <span id="queueSummary" class="muted small"></span>
+          <span class="queue-actions">
+            <button id="retryAllBtn" class="link small" type="button" hidden>Retry failed</button>
+            <button id="clearBtn" class="link small" type="button" hidden>Clear finished</button>
+          </span>
+        </div>
+        <p id="queueEmpty" class="muted small">Tick episodes on the left and press Download.<br>Keep this tab open while downloads run.</p>
+        <ul id="queueList" class="queue-list"></ul>
+      </div>
+      <div id="dlHistory" hidden>
+        <input id="historyFilter" class="history-filter" type="search" placeholder="Filter by show or episode…" autocomplete="off">
+        <p id="historyNote" class="muted small"></p>
+        <ul id="historyList" class="history-list"></ul>
+      </div>
+    </section>
+    </aside>
+  </main>
+
+  <footer class="bar" id="bar" hidden>
+    <span id="selSummary"></span>
+    <button id="fmtHint" class="link small" type="button" title="Change in Settings">as MP4</button>
+    <button id="downloadBtn" class="btn primary" type="button" disabled>Download</button>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "U-TV Downloader",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhyN83jSfHBt/FuRBZyDOa8wxnY+Kj0ZrAn4zkhJa+NHbSMfPbrwch/Up2P8gNi0KL2KWif4ZNx26Mp8LvHNIxJN7/GKw8VG11nUZ7c/IOxiuQx0hI0GKVVJvsCMrrujERwv+EKdqy61aamu1GzQ45g4HWagkqw51yIjZ8BY9pvBU51FDXHTbSL3B0XUvmR+LfbHizvdA/lfBcHCOUzHQELI/hcHa5QOrskifJJfF+3NXf7YlTdkLRTZWnjj+Ves41CDuy0efPXFngvJhsrrqZwwRGIssNFe9fxN3cA+wToNkbw52fBGAqdROcdw59KvgP+GifxpMnPvznx5hgeE/ewIDAQAB",
+  "description": "Pick seasons and episodes of u-tv.ru shows and download them at the best available quality.",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_title": "U-TV Downloader",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "downloads",
+    "downloads.open",
+    "notifications",
+    "storage",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://www.u-tv.ru/*",
+    "https://u-tv.ru/*",
+    "https://*.media1.ru/*",
+    "http://*.media1.ru/*"
+  ]
+}
